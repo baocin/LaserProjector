@@ -8,11 +8,12 @@
             The original control board and sd card are replaced with a DOIT ESP32 for more control.
         Laser: https://www.aliexpress.com/item/10pcs-lot-650nm-6mm-5V-5mW-Laser-Dot-Diode-Module-Copper-Head-Red/32583074085.html
             Simple, cheap, yet pretty visible at night or in shadow.
-        (New) Control Board: https://www.aliexpress.com/item/Free-shipping-ESP32-Development-Board-WiFi-Bluetooth-Ultra-Low-Power-Consumption-Dual-Core-ESP-32-ESP/32803195605.html
+        (New) Control Board: https://www.aliexpress.com/item/Free-shipping-ESP32-Development-Board-Wifi-Bluetooth-Ultra-Low-Power-Consumption-Dual-Core-ESP-32-ESP/32803195605.html
             Cheap Wifi + Bluetooth with TWO cpu cores (insanity!)
         Proper DACs(Digital to Analog converters): https://www.aliexpress.com/item/MCP4725-I2C-DAC-Breakout-module-development-board/32311696869.html
             While waiting for china shipping I'm using two R/2R DAC Ladders for 8 bit precision of laser movement.
             Operation Amplifiers used for the R/2R DACs: https://www.aliexpress.com/item/Free-Shipping-10-pcs-DIP-IC-8pins-UA741CN-UA741CP-UA741-OP-Amp-LM741-741-TI-Original/2040771771.html 
+            UPDATE: Now using the two built-in 8bit DACS on the ESP32 (GPIO 25 and 26)
 
     Plans (Roughly sorted from easiest to hardest):
         - Make web interface to control laser.
@@ -37,73 +38,51 @@
     Author: Michael Pedersen
 *********/
 
+#include <WiFi.h>
+#include <driver/dac.h>
+using namespace std;
+
 #define SERIAL_SPEED 115200
 #define DAC_PIN_COUNT 8
 
-int xPins[] = {32, 33, 25, 26, 27, 14, 12, 13};
-int xPinCount = DAC_PIN_COUNT;
-int yPins[] = {23, 22, 21, 19, 18, 5, 4, 2};
-int yPinCount = DAC_PIN_COUNT;
-
-int randomNumber = -255;
-
-void int_to_bin_digit(unsigned int in, int count, int* out)
-{
-  /* assert: count <= sizeof(int)*CHAR_BIT */
-  unsigned int mask = 1U << (count - 1);
-  int i;
-  for (i = 0; i < count; i++) {
-    out[i] = (in & mask) ? 1 : 0;
-    in <<= 1;
+void setX (int x) {
+  //DAC_CHANNEL_1 is GPIO 25
+  int status = dac_output_voltage(DAC_CHANNEL_1, x);
+  if (status == ESP_ERR_INVALID_ARG){
+    Serial.print("Error setting X axis to ");
+    Serial.println(x);
   }
 }
 
-void setX(int x) {
-  setPosition(x, xPins);
-}
-
-void setY(int y) {
-  setPosition(y, yPins);
-}
-
-void setPosition(int value, int pins[])
-{
-  int pinCount = DAC_PIN_COUNT;//sizeof( pins ) / sizeof( pins[0] );
-
-  int digit[8];
-  int_to_bin_digit(value, 8, digit);
-//   Serial.printf("  %u %u %u %u %u %u %u %u\n", digit[7], digit[6], digit[5], digit[4], digit[3], digit[2], digit[1], digit[0]);
-
-  for (byte p = 0; p < pinCount ; p++) {
-    digitalWrite(pins[p], digit[p]);
+void setY (int y) { 
+  //DAC_CHANNEL_2 is GPIO 26
+  int status = dac_output_voltage(DAC_CHANNEL_2, y);
+  if (status == ESP_ERR_INVALID_ARG){
+    Serial.print("Error setting Y axis to ");
+    Serial.println(y);
   }
 }
 
-void setup(void) {
+void setup() {
+  //Setup Serial
+  Serial.begin(SERIAL_SPEED);
+  while(!Serial) {
+    ; // wait for serial port to connect.
+  }
+  Serial.print("Setting serial speed to ");
+  Serial.println(SERIAL_SPEED);
+
   //Setup Randomness
   Serial.println("Setting up Randomness");
   randomSeed(analogRead(0));
 
-  //Setup Serial
-  Serial.print("Setting serial speed to ");
-  Serial.println(SERIAL_SPEED);
-  Serial.begin(SERIAL_SPEED);
-
   //Setup R/2R DAC for X coordinate
-  Serial.println("Setting X Pins");
-  for (int i = 0; i < xPinCount; i++) {
-    Serial.print("Setting output pin #");
-    Serial.println(xPins[i]);
-    pinMode(xPins[i], OUTPUT);
-  }
+  dac_output_enable(DAC_CHANNEL_1);
+  Serial.println("Setting X Pin");
 
   //Setup R/2R DAC for Y Coordinate
-  Serial.println("Setting Y Pins");
-  for (int i = 0; i < yPinCount; i++) {
-    Serial.print("Setting output pin #");
-    Serial.println(yPins[i]);
-    pinMode(yPins[i], OUTPUT);
-  }
+  dac_output_enable(DAC_CHANNEL_2);
+  Serial.println("Setting Y Pin");
 
   //Set Initial point to 0
   setX(0);
@@ -112,14 +91,12 @@ void setup(void) {
   Serial.println("Setup Done");
 }
 
-void loop(void) {
+void loop() {
   //For testing axises (Horizontal or Vertical = bad, Diagonal = Perfect)
   int randomNumber = random(0, 255);
 
   //Send the X/Y Coordinate
-  Serial.printf("Point [%u,%u]", randomNumber, randomNumber);
+  Serial.printf("Point [%u,%u]\n", randomNumber, randomNumber);
   setX(randomNumber);
   setY(randomNumber);
-
-  delay(50);
 }
