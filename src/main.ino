@@ -40,10 +40,18 @@
 
 #include <WiFi.h>
 #include <driver/dac.h>
+// #include "ILDAParser.h"
+#include "ScreenComponents.h"
+#include <vector>
+#include <math.h>       /* cos */
+
 using namespace std;
 
 #define SERIAL_SPEED 115200
 #define DAC_PIN_COUNT 8
+
+// ILDAParser parser;
+Frame frame;
 
 void setX (int x) {
   //DAC_CHANNEL_1 is GPIO 25
@@ -63,6 +71,12 @@ void setY (int y) {
   }
 }
 
+void drawPoint(Point p){
+  Serial.printf("Draw Point[%u,%u,%u] to frame\n", p.x, p.y, p.z);
+  setX(p.x);
+  setY(p.y);
+}
+
 void setup() {
   //Setup Serial
   Serial.begin(SERIAL_SPEED);
@@ -75,7 +89,7 @@ void setup() {
   //Setup Randomness
   Serial.println("Setting up Randomness");
   randomSeed(analogRead(0));
-
+  
   //Setup R/2R DAC for X coordinate
   dac_output_enable(DAC_CHANNEL_1);
   Serial.println("Setting X Pin");
@@ -84,19 +98,111 @@ void setup() {
   dac_output_enable(DAC_CHANNEL_2);
   Serial.println("Setting Y Pin");
 
-  //Set Initial point to 0
-  setX(0);
-  setY(0);
-
   Serial.println("Setup Done");
 }
 
 void loop() {
-  //For testing axises (Horizontal or Vertical = bad, Diagonal = Perfect)
-  int randomNumber = random(0, 255);
+  frame = getDigit(2);
+  frame.draw(drawPoint);
+}
 
-  //Send the X/Y Coordinate
-  Serial.printf("Point [%u,%u]\n", randomNumber, randomNumber);
-  setX(randomNumber);
-  setY(randomNumber);
+
+
+
+Frame getDigit(int x){
+  Frame frame;
+  Point a;
+
+  //1
+  if (x == 0 || x == 1 || x == 2 || x == 3 || x == 4 || x == 5 || x == 6 || x == 7 || x == 8 || x == 9 ){
+    a.x = 255;
+    a.y = 255;
+    frame.addPoint(a);
+  }
+  //2
+  if (x == 0 || x == 1 || x == 2 || x == 3 || x == 5 || x == 6 || x == 7 || x == 8 || x == 9 ){
+    a.x = 128;
+    a.y = 255;
+    frame.addPoint(a);
+  }
+  //3
+  if (x == 0 || x == 2 || x == 3 || x == 4 || x == 5 || x == 6 || x == 7 || x == 8 || x == 9 ){
+    a.x = 0;
+    a.y = 255;
+    frame.addPoint(a);
+  }
+  //4
+  if (x == 0 || x == 4 || x == 5 || x == 6 || x == 8 || x == 9 ){
+    a.x = 255;
+    a.y = 190;
+    frame.addPoint(a);
+  }
+  //5
+  if (x == 1){
+    a.x = 128;
+    a.y = 190;
+    frame.addPoint(a);
+  }
+  //6
+  if (x == 0 || x == 2 || x == 3 || x == 4 || x == 7 || x == 8 || x == 9 ){
+    a.x = 0;
+    a.y = 190;
+    frame.addPoint(a);
+  }
+  //7
+  if (x == 0 || x == 2 || x == 3 || x == 4 || x == 5 || x == 6 || x == 8 || x == 9 ){
+    a.x = 255;
+    a.y = 125;
+    frame.addPoint(a);
+  }
+  //8
+  if (x == 1 || x == 2 || x == 3 || x == 4 || x == 5 || x == 6 || x == 8 || x == 9 ){
+    a.x = 128;
+    a.y = 125;
+    frame.addPoint(a);
+  }
+  //9
+  if (x == 0 || x == 2 || x == 3 || x == 4 || x == 5 || x == 6 || x == 7 || x == 8 || x == 9 ){
+    a.x = 0;
+    a.y = 125;
+    frame.addPoint(a);
+  }
+  //10
+  if (x == 0 || x == 2 || x == 6 || x == 8 ){
+    a.x = 255;
+    a.y = 63;
+    frame.addPoint(a);
+  }
+  //11
+  if (x == 1 ){
+    a.x = 128;
+    a.y = 63;
+    frame.addPoint(a);
+  }
+  //12
+  if (x == 0 || x == 3 || x == 4 || x == 5 || x == 6 || x == 7 || x == 8 || x == 9 ){
+    a.x = 0;
+    a.y = 63;
+    frame.addPoint(a);
+  }
+  //13
+  if (x == 0 || x == 1 || x == 2 || x == 3 || x == 5 || x == 6 || x == 8 ){
+    a.x = 255;
+    a.y = 0;
+    frame.addPoint(a);
+  }
+  //14
+  if (x == 0 || x == 1 || x == 2 || x == 3 || x == 5 || x == 6 || x == 8 ){
+    a.x = 128;
+    a.y = 0;
+    frame.addPoint(a);
+  }
+  //15
+  if (x == 0 || x == 1 || x == 2 || x == 3 || x == 4 || x == 5 || x == 6 || x == 7 || x == 8 || x == 9 ){
+    a.x = 0;
+    a.y = 0;
+    frame.addPoint(a);
+  }
+
+  return frame;
 }
