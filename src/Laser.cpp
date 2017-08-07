@@ -2,12 +2,18 @@
 #include <driver/dac.h>
 #include <Arduino.h>
 
+#include <Wire.h>
+// #include <Adafruit_MCP4725.h>
+
 #include "Laser.h"
 #include "ScreenComponents.h"
 
 //DAC Pins
 const dac_channel_t DAC_X = DAC_CHANNEL_1; //Pin 25 by default for ESP32
 const dac_channel_t DAC_Y = DAC_CHANNEL_2; //Pin 26 by default for ESP32
+
+// Adafruit_MCP4725 DACX;
+// Adafruit_MCP4725 DACY;
 
 Laser::Laser()
 {
@@ -17,8 +23,19 @@ Laser::Laser()
     //Setup R/2R DAC for Y Coordinate
     dac_output_enable(DAC_Y);
 
-    setX(100);
-    setY(100);
+    //Will be used when converted to use 12 bit instead of the internal 8 bit DACs
+    // Wire.begin();
+    // DACX.begin(0x60);
+    // DACY.begin(0x61);
+    // // Set A2 and A3 as Outputs to make them our GND and Vcc,
+    // //which will power the MCP4725
+    // pinMode(A2, OUTPUT);
+    // pinMode(A3, OUTPUT);
+    // digitalWrite(A2, LOW);//Set A2 as GND
+    // digitalWrite(A3, HIGH);//Set A3 as Vcc
+
+    setX(0);
+    setY(0);
 }
 
 void Laser::drawPoint(Point p)

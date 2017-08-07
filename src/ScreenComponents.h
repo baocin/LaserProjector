@@ -14,6 +14,9 @@ class Point
 
     Point();
     Point(int x, int y, int z);
+    Point(int x, int y, int z, int r, int g, int b);
+    Point(int x, int y, int z, int r, int g, int b, bool blanking);
+    
 };
 
 //A frame is a rectangular bounding box containing pixels
@@ -56,6 +59,8 @@ class Screen
     std::vector<Frame> getVisibleFrames();
     void draw(void (*drawPoint)(Point));
     void addFrame(Frame frame, bool makeVisible);
+    void clearVisibleFrames();
+    void clearFrames();
 };
 
 #endif

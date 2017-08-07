@@ -4,12 +4,41 @@
 
 #include "ScreenComponents.h"
 
-Point::Point() {}
+Point::Point() {
+    x = 0;
+    y = 0;
+    z = 0;
+    r = 0;
+    g = 0;
+    b = 0;
+}
 
 Point::Point(int x, int y, int z)
 {
-    int r = 255, g = 255, b = 255;
-    bool blanking = false;
+    int r, g, b;
+    bool blanking;
+    x = x;
+    y = y;
+    z = z;
+    r = 255;
+    g = 255;
+    b = 255;
+    blanking = false;
+}
+
+Point::Point(int x, int y, int z, int r, int g, int b)
+{
+    x = x;
+    y = y;
+    z = z;
+    r = r;
+    g = g;
+    b = b;
+    blanking = false;
+}
+
+Point::Point(int x, int y, int z, int r, int g, int b, bool blanking)
+{
     x = x;
     y = y;
     z = z;
@@ -133,4 +162,12 @@ void Screen::addFrame(Frame frame, bool makeVisible)
     {
         visibleFrameIds.push_back(frame.id);
     }
+}
+
+void Screen::clearVisibleFrames(){
+    visibleFrameIds.clear();
+}
+
+void Screen::clearFrames(){
+    frames.clear();
 }
