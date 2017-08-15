@@ -1,0 +1,48 @@
+{
+    "license": "LGPL-2.1", 
+    "name": "WebSockets", 
+    "repository": {
+        "url": "https://github.com/Links2004/arduinoWebSockets.git", 
+        "type": "git"
+    }, 
+    "platforms": [
+        "atmelavr", 
+        "atmelsam", 
+        "espressif8266", 
+        "intel_arc32", 
+        "microchippic32", 
+        "nordicnrf51", 
+        "teensy", 
+        "timsp430"
+    ], 
+    "frameworks": [
+        "arduino"
+    ], 
+    "version": "2.0.7", 
+    "export": {
+        "exclude": [
+            "tests"
+        ]
+    }, 
+    "examples": [
+        "examples/*/*.ino"
+    ], 
+    "authors": [
+        {
+            "maintainer": true, 
+            "name": "Markus Sattler", 
+            "url": "https://github.com/Links2004", 
+            "email": null
+        }
+    ], 
+    "keywords": [
+        "web", 
+        "websocket", 
+        "wifi", 
+        "server", 
+        "client", 
+        "http"
+    ], 
+    "id": 549, 
+    "description": "WebSocket Server and Client for Arduino based on RFC6455"
+}

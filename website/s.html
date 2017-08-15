@@ -1,0 +1,227 @@
+<html>
+
+<head>
+    <script src="js/tracking-min.js"></script>
+    <script src="js/opentype.min.js"></script>
+    <script>
+
+    </script>
+    <style>
+        .flex {
+            display: flex;
+        }
+
+        .column {
+            flex: column;
+        }
+
+        .row {
+            flex: row;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="flex">
+
+        <div class="column">
+            <video id="video" width="400" height="300" preload autoplay loop muted></video>
+            <canvas id="screen" width="255" height="255" style="border:1px solid #000000;"></canvas>
+        </div>
+
+        <div class="column">
+            Clear </br>
+            <button id="clearFramesButton">clearFramesButton</button></br>
+            <button id="clearScreenButton">ClearScreenButton</button>
+            </br>
+            Get Info</br>
+            <button id="getVisibleFramesButton">getVisibleFramesButton</button></br>
+            <button id="getFrameInfoButton">getFrameInfoButton</button></br>
+            <button id="getFramesButton">getFrames</button></br>
+            <button id="drawScreenButton">drawScreenButton</button>
+
+            </br>
+            Add Frame </br>
+            <button id="addRandomFrameButton">addRandomFrameButton</button></br>
+            <button id="addFrameButton">addFrameButton</button>
+
+            </br>
+            Move Frame</br>
+            <button id="moveFrameXButton">moveFrameXButton</button></br>
+            <button id="moveFrameYButton">moveFrameYButton</button>
+
+            <button id="addPointButton">addPointButton</button></br>
+            X: <input type="text" id="x" value="0" placeholder="x" /></br>
+            Y: <input type="text" id="y" value="0" placeholder="y" /></br>
+            FrameID: <input type="text" id="frameId" value="0" /></br>
+        </div>
+
+    </div>
+
+    <script>
+        (function () {
+            var context = document.getElementById('screen').getContext('2d');
+            var connection = new WebSocket('ws://' + '192.168.1.147' + ':81/', ['arduino']);
+            connection.onopen = function () { connection.send('Connect ' + new Date()); };
+            connection.onerror = function (error) { console.log('WebSocket Error ', error); };
+            connection.onmessage = function (e) { console.log('Server: ', e.data); };
+
+
+            var el = document.getElementById('screen');
+            var ctx = el.getContext('2d');
+            var isDrawing;
+
+            el.onmousedown = function (e) {
+                isDrawing = true;
+                ctx.moveTo(e.clientX, e.clientY);
+            };
+            el.onmousemove = function (e) {
+                if (isDrawing) {
+                    ctx.lineTo(e.clientX, e.clientY);
+                    ctx.stroke();
+                }
+            };
+            el.onmouseup = function () {
+                isDrawing = false;
+            };
+
+            // var canvas = document.getElementById('screen');
+            //     var context = canvas.getContext('2d');
+
+            //     var FastTracker = function() {
+            //       FastTracker.base(this, 'constructor');
+            //     };
+            //     tracking.inherits(FastTracker, tracking.Tracker);
+            //     tracking.Fast.THRESHOLD = 80;
+            //     FastTracker.prototype.threshold = tracking.Fast.THRESHOLD;
+            //     FastTracker.prototype.track = function(pixels, width, height) {
+            //       var gray = tracking.Image.grayscale(pixels, width, height);
+            //       var corners = tracking.Fast.findCorners(gray, width, height);
+
+            //       this.emit('track', {
+            //         data: corners
+            //       });
+            //     };
+            //     var tracker = new FastTracker();
+            //     tracker.on('track', function(event) {
+            //       context.clearRect(0, 0, canvas.width, canvas.height);
+            //       var corners = event.data;
+            //       for (var i = 0; i < corners.length; i += 2) {
+            //         context.fillStyle = '#f00';
+            //         context.fillRect(corners[i], corners[i + 1], 1, 1);
+            //       }
+            //     });
+            // tracking.track('#video', tracker, { camera: true });
+            //             opentype.load('fonts/Brain_Flower.ttf', function (err, font) {
+            //                 if (err) {
+            //                     console.log('Font could not be loaded: ' + err);
+            //                 } else {
+            //                     console.log(font);
+            //                 }
+
+            //             });
+
+
+
+            document.getElementById("clearScreenButton").addEventListener("click", function (ev) {
+                connection.send(JSON.stringify({ "cmd": "clearScreen" }));
+            });
+            document.getElementById("clearFramesButton").addEventListener("click", function (ev) {
+                connection.send(JSON.stringify({ "cmd": "clearFrames" }));
+            });
+            document.getElementById("getVisibleFramesButton").addEventListener("click", function (ev) {
+                connection.send(JSON.stringify({ "cmd": "getVisibleFrames" }));
+            });
+            document.getElementById("getFramesButton").addEventListener("click", function (ev) {
+                connection.send(JSON.stringify({ "cmd": "getFrames" }));
+            });
+            document.getElementById("getFrameInfoButton").addEventListener("click", function (ev) {
+                var frameId = parseInt(document.getElementById("frameId").value);
+                connection.send(JSON.stringify({ "cmd": "getFrameInfo", "frameId": frameId }));
+            });
+            document.getElementById("drawScreenButton").addEventListener("click", function (ev) {
+                connection.send(JSON.stringify({ "cmd": "drawScreen" }));
+            });
+            document.getElementById("addRandomFrameButton").addEventListener("click", function (ev) {
+                connection.send(JSON.stringify({ "cmd": "addRandomFrame" }));
+            });
+
+            document.getElementById("moveFrameXButton").addEventListener("click", function (ev) {
+                var frameId = parseInt(document.getElementById("frameId").value);
+                connection.send(JSON.stringify({ "cmd": "moveFrame", "frameId": frameId, "x": 50, "y": 0 }));
+            });
+            document.getElementById("moveFrameYButton").addEventListener("click", function (ev) {
+                var frameId = parseInt(document.getElementById("frameId").value);
+                connection.send(JSON.stringify({ "cmd": "moveFrame", "frameId": frameId, "x": 0, "y": 50 }));
+            });
+            document.getElementById("addPointButton").addEventListener("click", function (ev) {
+                var frameId = parseInt(document.getElementById("frameId").value);
+                var x = parseInt(document.getElementById("x").value);
+                var y = parseInt(document.getElementById("y").value);
+                connection.send(JSON.stringify({ "cmd": "addPoint", "frameId": frameId, "x": x, "y": y }));
+            });
+
+            function send(cmd) {
+                connection.send(JSON.stringify({ "cmd": cmd }));
+            }
+
+            function getRandomArbitrary(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            document.getElementById("addFrameButton").addEventListener("click", function (ev) {
+                var ctx = document.getElementById('screen').getContext('2d');
+                var imgData = ctx.getImageData(0, 0, 255, 255).data;
+
+                var result = {};
+
+                result["frameId"] = Math.round(getRandomArbitrary(0, 1000));
+                result["height"] = 255;
+                result["width"] = 255;
+                result["points"] = [];
+
+                var emptyFrame = JSON.stringify({ "cmd": "addFrame", "json": result });
+                connection.send(emptyFrame);
+
+                var k = 0;
+                var prevX = 0;
+                var prevY = 0;
+
+                for (var i = 0; i < imgData.length; i += 4) {
+                    var width = 255;
+                    var height = 255;
+                    var x = (i / 4) % width;
+                    var y = Math.floor((i / 4) / width);
+                    //{"x":100, "y":100, "z":0, "r":100,"g":100,"b":100},
+                    // var point = {};
+                    // point["x"] = Math.round((x / width) * 100);
+                    // point["y"] = Math.round((y / height) * 100);
+                    // point["z"] = 0;
+                    // point["r"] = imgData[i];
+                    // point["g"] = imgData[i+1];
+                    // point["b"] = imgData[i+2];
+
+                    if (imgData[i] > 250) {
+                        // if ((x - prevX) > 10 || (y - prevY) > 10) {
+                        //Send the point
+                        var pointJson = JSON.stringify({
+                                "cmd": "addPoint", "frameId": result["frameId"],
+                                "x": Math.round((x / width) * 100),
+                                "y": Math.round((y / height) * 100)                            
+                        });
+
+                        prevX = x;
+                        prevY = y;
+                        connection.send(pointJson);
+
+                        k++;
+                    }
+                }
+                console.log("Wrote " + k + " pixels");
+            }, false);
+
+        })();
+    </script>
+</body>
+
+</html>
