@@ -1,0 +1,16 @@
+.flex {
+    display: flex;
+}
+
+.column {
+    flex: column;
+}
+
+.row {
+    flex: row;
+}
+
+#drawing {
+    height:255px;
+    width:255px;
+}
