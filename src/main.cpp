@@ -1,9 +1,4 @@
-/*
- * WebSocketServer_LEDcontrol.ino
- *
- *  Created on: 26.11.2015
- *
- */
+
 
 #include <Arduino.h>
 
@@ -19,53 +14,35 @@
 #include <Laser.h>
 #include <ScreenComponents.h>
 
+#include <ArduinoLog.h>
+
+//To remove logging statements uncomment the following line
+//#define DISABLE_LOGGING 
+
 #define SERIAL_SPEED 115200 //921600
 #define MAIN_SERIAL Serial
 
 //Laser
 Laser laser;
+int laserPin = 27;
 
 //Json
 const size_t bufferSize = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(6) + 50;
 
 //Wifi
-const char *ssid = "";
-const char *password = "";
+//const char *ssid = "MakerSpace Charlotte";
+//const char *password = "MakeLearnShare1";
+// const char *ssid = "Laser Projector";
+// const char *password = "projector";
 WiFiMulti WiFiMulti;
 ESP32WebServer server = ESP32WebServer(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
-//.toString(16);
-const char *indexHtml =
-    "<html><head><script>"
-    "var connection = new WebSocket('ws://'+location.hostname+':81/', ['arduino']);"
-    "connection.onopen = function () {connection.send('Connect ' + new Date()); };"
-    "connection.onerror = function (error) {console.log('WebSocket Error ', error);};"
-    "connection.onmessage = function (e) { console.log('Server: ', e.data);};"
-    "function sendXY() {"
-    "    var x = parseInt(document.getElementById('x').value);"
-    "    var y = parseInt(document.getElementById('y').value);"
-    ""
-    "           var msg = {x : x, y : y};"
-    "          console.log(msg);"
-    "         connection.send(JSON.stringify(msg));"
-    "    };"
-    "   </script>"
-    "  </head>"
-    " <body>"
-    "LED Control:"
-    "<br/>"
-    "<br/>"
-    "X: <input id=\"x\" type=\"range\" min=\"0\" max=\"255\" step=\"1\" oninput=\"sendXY();\" /><br/>"
-    "Y: <input id=\"y\" type=\"range\" min=\"0\" max=\"255\" step=\"1\" oninput=\"sendXY();\" />"
-    "<br/>"
-    ""
-    "</body></html>";
+const char *indexHtml = "<html><head></head><body><h1>Access Laser control from separate website</h1></body></html>";
 
 Frame parseFrameJson(String json)
 {
     Frame resultFrame;
-    //{"points": [{"x":100, "y":100, "z":0, "r":100,"g":100,"b":100}]}
     MAIN_SERIAL.print("bufferSize: " );
     MAIN_SERIAL.println(bufferSize);
     DynamicJsonBuffer jsonBuffer(bufferSize);
@@ -112,6 +89,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
     {
     case WStype_DISCONNECTED:
         MAIN_SERIAL.printf("[%u] Disconnected!\n", num);
+        webSocket.sendTXT(num, "{\"status\": \"Disconnected\"}");
         break;
     case WStype_CONNECTED:
     {
@@ -119,7 +97,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
         MAIN_SERIAL.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
 
         // send message to client
-        webSocket.sendTXT(num, "Connected");
+        webSocket.sendTXT(num, "{\"status\": \"Connected\"}");
     }
     break;
     case WStype_TEXT:
@@ -139,37 +117,62 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
         if (command.compareTo("clearScreen") == 0){
             MAIN_SERIAL.println("Clear Screen");
             laser.screen.clearVisibleFrames();
+            webSocket.sendTXT(num, "{}" );
+            webSocket.sendTXT(num, "{\"mutation\":\"CLEAR_SCREEN\"}");
+            
         }else if (command.compareTo("getRam") == 0){
             long  fh = ESP.getFreeHeap();
             MAIN_SERIAL.println(fh);
-            // webSocket.sendTXT(num, fh);
+
+            DynamicJsonBuffer jsonBuffer(bufferSize);
+            JsonObject &root = jsonBuffer.createObject();
+            root["mutation"] = "RAM";
+            String response;
+            root.printTo(response);
+            webSocket.sendTXT(num, response);
+
+            //webSocket.sendTXT(num, fh);
+            webSocket.sendTXT(num, "{\"action\": \"getRam\"}");
         }else if (command.compareTo("clearFrames") == 0){
             MAIN_SERIAL.println("Clear Frames");
             laser.screen.clearFrames();
+            webSocket.sendTXT(num, "{\"mutation\":\"CLEAR_FRAMES\"}");
         }else if (command.compareTo("addRandomFrame") == 0){
-            // laser.screen.clearFrames();
-            Frame newFrame = laser.getDigit(random(0, 9), random(30, 70), random(15, 25));
-            laser.screen.removeFrame(newFrame.id);
+            laser.screen.clearFrames();
+            int a = random(0, 9);
+            int b = random(20, 60);
+            int c = random(15, 25);
+            MAIN_SERIAL.printf("Laser Digit (%d, %d, %d)", a, b, c);
+            Frame newFrame = laser.getDigit(a,255, 255);
+            // laser.screen.removeFrame(newFrame.id);
             laser.screen.addFrame(newFrame, true);
             laser.screen.visibleFrameIds[newFrame.id] = newFrame.id;
+            //\"action\": \"addRandomFrame\"
+            webSocket.sendTXT(num, "{}");
         }else if (command.compareTo("addFrame") == 0){
             MAIN_SERIAL.println("Add Frame");
             //Parse Frame JSON
             String rawJson = root.get<String>("json");
-
+            
             MAIN_SERIAL.println(rawJson);
             Frame newFrame = parseFrameJson(rawJson);
             laser.screen.addFrame(newFrame, true);
+            webSocket.sendTXT(num, "{}");
         }else if (command.compareTo("addPoint") == 0){
             MAIN_SERIAL.println("Add Point");
             long frameId = root["frameId"];
-            long x = root["x"];
-            long y = root["y"];
+
             Point tempPoint;
-            tempPoint.x = x;
-            tempPoint.y = y;
+            tempPoint.x = (long) root["x"];
+            tempPoint.y = (long) root["y"];
+            tempPoint.z = (long) root["z"];
+            tempPoint.r = (long) root["r"];
+            tempPoint.g = (long) root["g"];
+            tempPoint.b = (long) root["b"];
+            tempPoint.blanking = (bool) root["blanking"];
+
             laser.screen.frames[frameId].addPoint(tempPoint);
-            
+            webSocket.sendTXT(num, "{}");
         }else if (command.compareTo("getVisibleFrames") == 0){
             MAIN_SERIAL.println("Get Visible Frame List");
             //Get a json list of all visible frame ids
@@ -180,6 +183,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             {
                 frameIds.add(laser.screen.visibleFrameIds[i]);
             }
+
+            root["mutation"] = "VISIBLE_FRAME_IDS";
 
             String response;
             root.printTo(response);
@@ -202,6 +207,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
                 frameIds.add(frames[i].id);
             }
 
+            root["mutation"] = "ALL_FRAME_IDS";
+
             String response;
             root.printTo(response);
             webSocket.sendTXT(num, response);
@@ -210,7 +217,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             long x = root["x"];
             long y = root["y"];
             laser.screen.frames[frameId].move(x,y);
-
+            webSocket.sendTXT(num, "{}");
         }else if (command.compareTo("getFrameInfo") == 0){
             long frameId = root["frameId"];
             JsonObject &newJson = jsonBuffer.createObject();
@@ -230,6 +237,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
                 newJson["y"] = selectedFrame.y;
                 newJson["width"] = selectedFrame.width;
                 newJson["height"] = selectedFrame.height;
+                newJson["changed"] = selectedFrame.changed;
+                newJson["numPoints"] = selectedFrame.points.size();
 
                 //Read all the points from this frame
                 JsonArray &points = newJson.createNestedArray("points");
@@ -238,25 +247,56 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
                     JsonObject &point = jsonBuffer.createObject();
                     point["x"] = selectedFrame.points[i].x;
                     point["y"] = selectedFrame.points[i].y;
-                    // point["z"] = selectedFrame.points[i].z;
-                    // point["r"] = selectedFrame.points[i].r;
-                    // point["g"] = selectedFrame.points[i].g;
-                    // point["b"] = selectedFrame.points[i].b;
-                    // point["blanking"] = selectedFrame.points[i].blanking;
+                    point["z"] = selectedFrame.points[i].z;
+                    point["r"] = selectedFrame.points[i].r;
+                    point["g"] = selectedFrame.points[i].g;
+                    point["b"] = selectedFrame.points[i].b;
+                    point["blanking"] = selectedFrame.points[i].blanking;
                     points.add(point);
                 }
 
+                newJson["mutation"] = "FRAME_INFO";
+
                 String response;
                 newJson.printTo(response);
+                MAIN_SERIAL.println(response);
                 webSocket.sendTXT(num, response);
             }
-        }else if (command.compareTo("addPoint") == 0){
-            MAIN_SERIAL.println("Add Point");
         }else if (command.compareTo("drawScreen") == 0){
             MAIN_SERIAL.println("Drawing screen");
             laser.draw();
+            webSocket.sendTXT(num, "{}");
+        }else if (command.compareTo("laserDelay") == 0){
+            MAIN_SERIAL.println("Setting the laser delay");
+            float duration = root["duration"];
+            laser.laserDelay = duration;
+            webSocket.sendTXT(num, "{}");
+        // }else if (command.compareTo("optimizeOrder") == 0){
+        //     laser.optimizeOrder = !laser.optimizeOrder;
+        //     MAIN_SERIAL.printf("optimize Order: %i", laser.optimizeOrder);
+        //     // webSocket.sendTXT(num, laser.optimizeOrder);
+        //     webSocket.sendTXT(num, "{\"action\": \"optimizeOrder\"}");
+        }else if (command.compareTo("toggleLaser") == 0){
+            laser.toggleLaser = !laser.toggleLaser;
+            MAIN_SERIAL.printf("toggleLaser: %i", laser.toggleLaser);
+            // webSocket.sendTXT(num, laser.toggleLaser);
+            webSocket.sendTXT(num, "{}");
+        }else if (command.compareTo("setChanged") == 0){
+            long frameId = root["frameId"];
+            laser.screen.frames[frameId].changed = !laser.screen.frames[frameId].changed;
+            MAIN_SERIAL.printf("changed: %i", laser.screen.frames[frameId].changed);
+            // webSocket.sendTXT(num, laser.screen.frames[frameId].changed);
+            webSocket.sendTXT(num, "{}");
+        }else if (command.compareTo("optimizePointOrder") == 0){
+            long frameId = root["frameId"];
+            laser.screen.frames[frameId].optimizePointOrder();
+            webSocket.sendTXT(num, "{}");
+        }else if (command.compareTo("restart") == 0){
+            MAIN_SERIAL.println("Restart requested...");
+            esp_restart();
         }else{
             MAIN_SERIAL.println("No Valid command found");
+            webSocket.sendTXT(num, "{}");
         }
     }
 }
@@ -274,53 +314,61 @@ void setup()
     MAIN_SERIAL.println();
 
     MAIN_SERIAL.setDebugOutput(true);
-    MAIN_SERIAL.print("Setting serial speed to ");
-    MAIN_SERIAL.println(SERIAL_SPEED);
 
+    //Setup Logging
+    Log.begin(LOG_LEVEL_VERBOSE, &MAIN_SERIAL);
+    Log.notice("Setting serial speed to %d" CR, SERIAL_SPEED);
+    
     //Setup Random
-    MAIN_SERIAL.println("Setting up Randomness");
+    Log.notice("Setting up Randomness" CR);
     randomSeed(analogRead(0));
 
     //Setup Laser
-    MAIN_SERIAL.println("Setting up Laser");
+    Log.notice("Setting up Laser" CR);
+    pinMode(laserPin, OUTPUT);
+    digitalWrite(laserPin, LOW);
     
     //Setup Wifi
+    // WiFi.softAP(ssid, password);
     WiFiMulti.addAP(ssid, password);
     while (WiFiMulti.run() != WL_CONNECTED)
     {
         delay(100);
     }
     MAIN_SERIAL.println("");
-    MAIN_SERIAL.println("WiFi connected");
-    MAIN_SERIAL.println("IP address: ");
-    MAIN_SERIAL.println(WiFi.localIP());
+    Log.notice("WiFi connected" CR);
+    Log.notice("IP address: %s"  CR, WiFi.localIP().toString());
+    // Log.notice(WiFi.localIP());
+    Serial.println(WiFi.localIP());
 
     // start webSocket server
-    MAIN_SERIAL.println("Starting WebSocket Server");
+    Log.notice("Starting WebSocket Server" CR);
     webSocket.begin();
     webSocket.onEvent(webSocketEvent);
-    MAIN_SERIAL.println("Websockets started");
+    Log.notice("Websockets started" CR);
 
     if (MDNS.begin("esp8266"))
     {
-        MAIN_SERIAL.println("MDNS responder started");
+        Log.notice("MDNS responder started" CR);
     }
 
-    MAIN_SERIAL.println("Setting up Http REST endpoints");
+    Log.notice("Setting up Http REST endpoints" CR);
+
     // handle index
+    //TODO: Load from Filesystem
     server.on("/", []() {
         // send index.html
         server.send(200, "text/html", indexHtml);
     });
 
-    MAIN_SERIAL.println("Http WebServer started.");
+    Log.notice("Http WebServer started." CR);
     server.begin();
 
     // Add service to MDNS
     MDNS.addService("http", "tcp", 80);
     MDNS.addService("ws", "tcp", 81);
 
-    MAIN_SERIAL.println("Setup Done.");
+    Log.notice("Setup Done." CR);
 }
 
 void loop()

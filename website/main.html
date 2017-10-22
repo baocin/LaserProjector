@@ -42,6 +42,10 @@
             <button id="moveFrameYButton">moveFrameYButton</button>
 
             <button id="addPointButton">addPointButton</button></br>
+            <button id="optimizeOrderButton">optimizeOrderButton</button></br>
+            <button id="toggleLaserButton">toggleLaserButton</button></br>
+            <button id="setChangedButton">setChangedButton</button></br>
+            
             <!-- <button id="laserToggle">laserToggle</button></br> -->
             X: 
             <!-- <input type="text" id="x" value="0" placeholder="x" /></br> -->
@@ -50,7 +54,7 @@
             <!-- <input type="text" id="y" value="0" placeholder="y" /></br> -->
             <input type="range" step="1" min="0" max="255" value="60" id="y"/></br>
             FrameID: <input type="text" id="frameId" value="0" /></br>
-            Laser Delay <input type="range" step="1" min="1" max="10000" value="1000" id="changeLaserDelay"/>
+            Laser Delay <input type="range" step="0.05" min="0.01" max="100" value="25" id="changeLaserDelay"/>
         </div>
 
     </div>
@@ -126,6 +130,18 @@
             //     connection.send(JSON.stringify({ "cmd": "laserStateToggle" }));
             // });
 
+                    
+            document.getElementById("toggleLaserButton").addEventListener("click", function (ev) {
+                connection.send(JSON.stringify({ "cmd": "toggleLaser" }));
+            });        
+            document.getElementById("setChangedButton").addEventListener("click", function (ev) {
+                var frameId = parseInt(document.getElementById("frameId").value);
+                connection.send(JSON.stringify({ "cmd": "setChanged", "frameId": frameId}));
+            });
+            document.getElementById("optimizeOrderButton").addEventListener("click", function (ev) {
+                var frameId = parseInt(document.getElementById("frameId").value);
+                connection.send(JSON.stringify({ "cmd": "optimizePointOrder", "frameId": frameId}));
+            });
             document.getElementById("clearFramesButton").addEventListener("click", function (ev) {
                 connection.send(JSON.stringify({ "cmd": "clearFrames" }));
             });

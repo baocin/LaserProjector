@@ -1,8 +1,9 @@
 #include <algorithm>
 #include <driver/dac.h>
 #include <Arduino.h>
-
+#include <algorithm>
 #include <Wire.h>
+#include <ArduinoLog.h>
 // #include <Adafruit_MCP4725.h>
 
 #include "Laser.h"
@@ -11,6 +12,7 @@
 //DAC Pins
 const dac_channel_t DAC_X = DAC_CHANNEL_1; //Pin 25 by default for ESP32
 const dac_channel_t DAC_Y = DAC_CHANNEL_2; //Pin 26 by default for ESP32
+const int LASER_PIN = 27;
 
 // Adafruit_MCP4725 DACX;
 // Adafruit_MCP4725 DACY;
@@ -34,52 +36,61 @@ Laser::Laser()
     // digitalWrite(A2, LOW);//Set A2 as GND
     // digitalWrite(A3, HIGH);//Set A3 as Vcc
 
-    setX(0);
-    setY(0);
+    pinMode(LASER_PIN, OUTPUT);
 }
-
-void Laser::drawPoint(Point p)
-{
-    //   Serial.printf("Draw Point[%u,%u,%u] to frame\n", p.x, p.y, p.z);
-    setX(p.x);
-    setY(p.y);
-
-    //Delay ~500 microseconds
-    //the average cycle counter per millisecond is 500,000
-    //230000 is unreliable, 400,000 is reliable by
-    //Reason: Motors need time to physically move into position.
-        //TODO: modify delay so it is dependent on how much the motor has to move in both x and y axis (separately)
-    uint32_t cycleCount = ESP.getCycleCount() + 250000;
-    while (ESP.getCycleCount() < cycleCount){
-        ;
-    }
-} 
 
 void Laser::draw()
 {
-    this->screen.draw(this->drawPoint);
-}
+    // for (long f = 0; f < this -> screen.visibleFrameIds.size(); f++)
+    // {
+    if (this -> screen.visibleFrameIds.size() <= 0) return;
 
-void Laser::setX(int x)
-{
-    //DAC_CHANNEL_1 is GPIO 25
-    int status = dac_output_voltage(DAC_X, x);
-    if (status == ESP_ERR_INVALID_ARG)
+    long frameId = this -> screen.visibleFrameIds[0];
+
+    if (this -> screen.frames[frameId].changed && optimizeOrder){
+        //Ro-optimize frame
+        // if (optimizeOrder){
+           this -> screen.frames[frameId].optimizePointOrder();
+        // }
+    }
+    
+    Point previousPoint;
+    for (long p = 0, len = this -> screen.frames[frameId].points.size(); p < len; p++)
     {
-        // Serial.print("Error setting X axis to ");
-        // Serial.println(x);
+        Point point = this -> screen.frames[frameId].points[p];
+        point.x += this -> screen.frames[frameId].x;
+        point.y += this -> screen.frames[frameId].y;
+
+        if (this -> screen.frames[frameId].isPointInside(point))
+        {
+            //Move to Position
+            drawPoint(point.x, point.y);
+            //
+            // delayMicroseconds(50);
+
+            if(toggleLaser)
+                digitalWrite(LASER_PIN, LOW);
+
+            //Delay 1000 microseconds for motors to physically move into position.
+            //TODO: modify delay so it is dependent on how much the motor has to move in both x and y axis (separately)
+            //Max: 16383
+            //delayMicroseconds(10);
+            float distance = abs(point.x - previousPoint.x) + abs(point.y - previousPoint.y);
+            //Log.notice("Current Point (%d,%d)  -  Previous Point (%d,%d)" CR, point.x,point.y, previousPoint.x, previousPoint.y);
+            delayMicroseconds(distance * laserDelay);
+
+            if(toggleLaser)
+                digitalWrite(LASER_PIN, HIGH);
+        }
+
+        previousPoint = point;
     }
 }
 
-void Laser::setY(int y)
+void Laser::drawPoint(int x, int y)
 {
-    //DAC_CHANNEL_2 is GPIO 26
-    int status = dac_output_voltage(DAC_Y, y);
-    if (status == ESP_ERR_INVALID_ARG)
-    {
-        // Serial.print("Error setting Y axis to ");
-        // Serial.println(y);
-    }
+    dac_output_voltage(DAC_X, x);
+    dac_output_voltage(DAC_Y, y);
 }
 
 Frame Laser::getDigit(int x, int height, int width)

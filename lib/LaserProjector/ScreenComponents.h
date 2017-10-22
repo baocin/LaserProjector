@@ -4,19 +4,23 @@
 #include <vector>
 #include <unordered_map>
 
+//todo: typedef void (*drawPoint)(Point);
+
 //The most primitive primitive of the drawable image
 class Point
 {
   public:
-    int x, y;//, z;
-    // int r, g, b;
-    //bool blanking; //true for laser on, false otherwise
+    int x, y, z;
+    int r, g, b;
+    bool blanking; //true for turn laser on only when drawing the point, otherwise just move to the point
 
     Point();
     Point(int x, int y);
-    // Point(int x, int y, int z);
-    // Point(int x, int y, int z, int r, int g, int b);
-    // Point(int x, int y, int z, int r, int g, int b, bool blanking);
+    Point(int x, int y, int z);
+    Point(int x, int y, int z, int r, int g, int b);
+    Point(int x, int y, int z, int r, int g, int b, bool blanking);
+    bool operator==(const Point& rhs) const;
+    bool operator< (const Point &rhs) const;
     
 };
 
@@ -28,18 +32,21 @@ class Frame
     std::vector<Point> points;
     int width, height;
     int x, y;
-
+    bool changed = true;
+    
     Frame();
     void assignPoints(std::vector<Point> points);
     void addPoint(Point p);
-    void draw(void (*drawPoint)(Point));
     void shift(int deltaX, int deltaY);
     void move(int newX, int newY);
     void setPosition(int newX, int newY);
     bool isPointInside(Point p);
+    void optimizePointOrder();
+    long getClosestPoint(long currentIndex, std::vector<Point> remaining);
+    void removeDuplicatePoints();
 };
 
-//An analog to the entire visible
+//An analog to the entire visible vasting area
 class Screen
 {
   public:
@@ -59,7 +66,6 @@ class Screen
     void advanceStep(int stepCount = 1);
     void removeFrame(long id);
     std::vector<Frame> getVisibleFrames();
-    void draw(void (*drawPoint)(Point));
     void addFrame(Frame frame, bool makeVisible);
     void clearVisibleFrames();
     void clearFrames();
