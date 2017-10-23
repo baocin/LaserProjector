@@ -69,6 +69,9 @@ class Screen
     void addFrame(Frame frame, bool makeVisible);
     void clearVisibleFrames();
     void clearFrames();
+    bool hasFrame(long frameId);
+    void setVisibility(long frameId, bool isVisible);
+    bool isVisible(long frameId);
 };
 
 #endif

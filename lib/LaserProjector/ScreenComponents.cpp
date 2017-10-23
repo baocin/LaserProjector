@@ -256,3 +256,32 @@ void Screen::clearFrames(){
     frames.clear();
     visibleFrameIds.clear();
 }
+
+bool Screen::hasFrame(long frameId){
+    return (this->frames.find(frameId) != this->frames.end());
+}
+
+void Screen::setVisibility(long frameId, bool isVisible){
+    if (isVisible){
+        if (this->hasFrame(frameId)){
+            this->visibleFrameIds.push_back(frameId);
+        }
+    }else{
+        this->visibleFrameIds.erase(
+            std::remove(
+                this->visibleFrameIds.begin(),
+                this->visibleFrameIds.end(),
+                frameId
+            ),
+            this->visibleFrameIds.end()
+        );
+    }
+}
+
+bool Screen::isVisible(long frameId){
+    return std::find(
+        this->visibleFrameIds.begin(),
+        this->visibleFrameIds.end(),
+        frameId
+    ) != this->visibleFrameIds.end();
+}

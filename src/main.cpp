@@ -26,14 +26,14 @@
 Laser laser;
 int laserPin = 27;
 
-//Json
-const size_t bufferSize = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(6) + 50;
-
 //Wifi
 //const char *ssid = "MakerSpace Charlotte";
 //const char *password = "MakeLearnShare1";
+const char *ssid = "Colin & Michael's Bachelor Pad";
+const char *password = "skyhouse2017";
 // const char *ssid = "Laser Projector";
 // const char *password = "projector";
+
 WiFiMulti WiFiMulti;
 ESP32WebServer server = ESP32WebServer(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -43,9 +43,9 @@ const char *indexHtml = "<html><head></head><body><h1>Access Laser control from 
 Frame parseFrameJson(String json)
 {
     Frame resultFrame;
-    MAIN_SERIAL.print("bufferSize: " );
-    MAIN_SERIAL.println(bufferSize);
-    DynamicJsonBuffer jsonBuffer(bufferSize);
+
+    // Assume 200 points
+    DynamicJsonBuffer jsonBuffer(JSON_ARRAY_SIZE(200) + JSON_OBJECT_SIZE(6) + 200*JSON_OBJECT_SIZE(7));
 
     JsonObject &root = jsonBuffer.parseObject(json);
 
@@ -63,20 +63,19 @@ Frame parseFrameJson(String json)
     {
         MAIN_SERIAL.print("Parsing point ");
         MAIN_SERIAL.println(i);
-        // JsonObject &point = points[i];
-        Point tempPoint; //TODO, add rgb
+        Point tempPoint;
 
         tempPoint.x = points[i]["x"];
         tempPoint.y = points[i]["y"];
-        // tempPoint.z = points[i]["z"];
-        // tempPoint.r = points[i]["r"];
-        // tempPoint.g = points[i]["g"];
-        // tempPoint.b = points[i]["b"];
-        // tempPoint.blanking = points[i]["blanking"];
+        tempPoint.z = points[i]["z"];
+        tempPoint.r = points[i]["r"];
+        tempPoint.g = points[i]["g"];
+        tempPoint.b = points[i]["b"];
+        tempPoint.blanking = points[i]["blanking"];
 
         resultFrame.addPoint(tempPoint);
         // MAIN_SERIAL.printf("Added point(%d,%d,%d,%d,%d,%d);\n", tempPoint.x, tempPoint.y, tempPoint.z, tempPoint.r, tempPoint.g, tempPoint.b);
-        MAIN_SERIAL.printf("Added point(%d,%d);\n", tempPoint.x, tempPoint.y);
+        // MAIN_SERIAL.printf("Added point(%d,%d);\n", tempPoint.x, tempPoint.y);
     }
 
     
@@ -104,7 +103,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
         String text = (const char *)payload;
         MAIN_SERIAL.printf("[%u] get Text: %s\n", num, payload);
 
-        DynamicJsonBuffer jsonBuffer(bufferSize);
+        DynamicJsonBuffer jsonBuffer(JSON_OBJECT_SIZE(5));
         JsonObject &root = jsonBuffer.parseObject(text);
         
         String command = root.get<String>("cmd");
@@ -112,23 +111,21 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
         MAIN_SERIAL.println(command);
 
         long  fh = ESP.getFreeHeap();
-            MAIN_SERIAL.println(fh);
+        MAIN_SERIAL.println(fh);
         
         if (command.compareTo("clearScreen") == 0){
             MAIN_SERIAL.println("Clear Screen");
             laser.screen.clearVisibleFrames();
-            webSocket.sendTXT(num, "{}" );
             webSocket.sendTXT(num, "{\"mutation\":\"CLEAR_SCREEN\"}");
             
         }else if (command.compareTo("getRam") == 0){
             long  fh = ESP.getFreeHeap();
             MAIN_SERIAL.println(fh);
-
-            DynamicJsonBuffer jsonBuffer(bufferSize);
-            JsonObject &root = jsonBuffer.createObject();
-            root["mutation"] = "RAM";
+            JsonBuffer* jsonBufferRam = new StaticJsonBuffer<JSON_OBJECT_SIZE(2)>();
+            JsonObject &rootRam = jsonBufferRam->createObject();
+            rootRam["mutation"] = "RAM";
             String response;
-            root.printTo(response);
+            rootRam.printTo(response);
             webSocket.sendTXT(num, response);
 
             //webSocket.sendTXT(num, fh);
@@ -137,6 +134,19 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             MAIN_SERIAL.println("Clear Frames");
             laser.screen.clearFrames();
             webSocket.sendTXT(num, "{\"mutation\":\"CLEAR_FRAMES\"}");
+        }else if (command.compareTo("deleteFrame") == 0){
+            MAIN_SERIAL.println("Delete Frame");
+            long frameId = root["frameId"];
+            laser.screen.removeFrame(frameId);
+            webSocket.sendTXT(num, "{\"mutation\":\"DELETE_FRAME\"}");
+        }else if (command.compareTo("clearFrame") == 0){
+            MAIN_SERIAL.println("Clear Frame");
+            long frameId = root["frameId"];
+            Frame clearedFrame = laser.screen.frames[frameId];
+            clearedFrame.points.clear();
+            laser.screen.removeFrame(frameId);
+            laser.screen.addFrame(clearedFrame, false);
+            webSocket.sendTXT(num, "{\"mutation\":\"CLEAR_FRAME\"}");
         }else if (command.compareTo("addRandomFrame") == 0){
             laser.screen.clearFrames();
             int a = random(0, 9);
@@ -144,7 +154,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             int c = random(15, 25);
             MAIN_SERIAL.printf("Laser Digit (%d, %d, %d)", a, b, c);
             Frame newFrame = laser.getDigit(a,255, 255);
-            // laser.screen.removeFrame(newFrame.id);
             laser.screen.addFrame(newFrame, true);
             laser.screen.visibleFrameIds[newFrame.id] = newFrame.id;
             //\"action\": \"addRandomFrame\"
@@ -176,18 +185,18 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
         }else if (command.compareTo("getVisibleFrames") == 0){
             MAIN_SERIAL.println("Get Visible Frame List");
             //Get a json list of all visible frame ids
-            DynamicJsonBuffer jsonBuffer(bufferSize);
-            JsonObject &root = jsonBuffer.createObject();
-            JsonArray &frameIds = root.createNestedArray("frameIds");
+            DynamicJsonBuffer jsonBufferVisibile(JSON_ARRAY_SIZE(10));            
+            JsonObject &rootVisible = jsonBufferVisibile.createObject();
+            JsonArray &frameIds = rootVisible.createNestedArray("frameIds");
             for (int i = 0, len = laser.screen.visibleFrameIds.size(); i < len; i++)
             {
                 frameIds.add(laser.screen.visibleFrameIds[i]);
             }
 
-            root["mutation"] = "VISIBLE_FRAME_IDS";
+            rootVisible["mutation"] = "VISIBLE_FRAME_IDS";
 
             String response;
-            root.printTo(response);
+            rootVisible.printTo(response);
             webSocket.sendTXT(num, response);
         }else if (command.compareTo("getFrames") == 0){
             MAIN_SERIAL.println("Get All Frame List");
@@ -198,8 +207,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             {
                 frames.push_back(kv.second);
             }
-
-            DynamicJsonBuffer jsonBuffer(bufferSize);
+            // Assume 20 frames
+            DynamicJsonBuffer jsonBuffer(JSON_ARRAY_SIZE(20) + JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(1));
             JsonObject &root = jsonBuffer.createObject();
             JsonArray &frameIds = root.createNestedArray("frameIds");
             for (int i = 0, len = frames.size(); i < len; i++)
@@ -218,19 +227,25 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             long y = root["y"];
             laser.screen.frames[frameId].move(x,y);
             webSocket.sendTXT(num, "{}");
+        }else if (command.compareTo("setFrameVisibility") == 0){
+            long frameId = root["frameId"];
+            bool state = root["state"];
+            laser.screen.setVisibility(frameId, state);
+            webSocket.sendTXT(num, "{}");
         }else if (command.compareTo("getFrameInfo") == 0){
             long frameId = root["frameId"];
-            JsonObject &newJson = jsonBuffer.createObject();
-
             //Get a json list of all visible frame ids
             if (laser.screen.frames.count(frameId) == 0)
             {
                 //Couldn't find frameId in the frames list
                 webSocket.sendTXT(num, "{}");
-                // root.printTo(response); //print empty JSON
             }
             else
             {
+                // Assume 200 points
+                DynamicJsonBuffer jsonBuffer(JSON_ARRAY_SIZE(200) + JSON_OBJECT_SIZE(8) + 200*JSON_OBJECT_SIZE(7));
+                JsonObject &newJson = jsonBuffer.createObject();
+
                 Frame selectedFrame = laser.screen.frames[frameId];
                 newJson["frameId"] = selectedFrame.id;
                 newJson["x"] = selectedFrame.x;
@@ -239,6 +254,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
                 newJson["height"] = selectedFrame.height;
                 newJson["changed"] = selectedFrame.changed;
                 newJson["numPoints"] = selectedFrame.points.size();
+                newJson["visible"] = laser.screen.isVisible(selectedFrame.id);
 
                 //Read all the points from this frame
                 JsonArray &points = newJson.createNestedArray("points");
