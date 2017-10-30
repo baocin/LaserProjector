@@ -47,12 +47,12 @@ void Laser::draw()
 
     long frameId = this -> screen.visibleFrameIds[0];
 
-    if (this -> screen.frames[frameId].changed && optimizeOrder){
-        //Ro-optimize frame
-        // if (optimizeOrder){
-           this -> screen.frames[frameId].optimizePointOrder();
-        // }
-    }
+    // if (optimizeOrder){
+    //     //Ro-optimize frame
+    //     // if (optimizeOrder){
+    //        this -> screen.frames[frameId].optimizePointOrder();
+    //     // }
+    // }
     
     Point previousPoint;
     for (long p = 0, len = this -> screen.frames[frameId].points.size(); p < len; p++)
@@ -65,8 +65,6 @@ void Laser::draw()
         {
             //Move to Position
             drawPoint(point.x, point.y);
-            //
-            // delayMicroseconds(50);
 
             if(toggleLaser)
                 digitalWrite(LASER_PIN, LOW);

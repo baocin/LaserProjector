@@ -1,5 +1,3 @@
-
-
 #include <Arduino.h>
 
 #include <WiFi.h>
@@ -107,11 +105,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
         JsonObject &root = jsonBuffer.parseObject(text);
         
         String command = root.get<String>("cmd");
-        MAIN_SERIAL.print("Command: ");
-        MAIN_SERIAL.println(command);
+        // MAIN_SERIAL.print("Command: ");
+        // MAIN_SERIAL.println(command);
 
         long  fh = ESP.getFreeHeap();
-        MAIN_SERIAL.println(fh);
+        // MAIN_SERIAL.println(fh);
         
         if (command.compareTo("clearScreen") == 0){
             MAIN_SERIAL.println("Clear Screen");
@@ -138,22 +136,39 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             MAIN_SERIAL.println("Delete Frame");
             long frameId = root["frameId"];
             laser.screen.removeFrame(frameId);
-            webSocket.sendTXT(num, "{\"mutation\":\"DELETE_FRAME\"}");
+
+            DynamicJsonBuffer jsonBufferDelete(JSON_ARRAY_SIZE(2));            
+            JsonObject &rootDelete = jsonBufferDelete.createObject();
+            rootDelete["mutation"] = "DELETE_FRAME";
+            rootDelete["frameId"] = frameId;
+            String response;
+            rootDelete.printTo(response);
+            webSocket.sendTXT(num, response);
         }else if (command.compareTo("clearFrame") == 0){
             MAIN_SERIAL.println("Clear Frame");
             long frameId = root["frameId"];
-            Frame clearedFrame = laser.screen.frames[frameId];
-            clearedFrame.points.clear();
-            laser.screen.removeFrame(frameId);
-            laser.screen.addFrame(clearedFrame, false);
-            webSocket.sendTXT(num, "{\"mutation\":\"CLEAR_FRAME\"}");
+            laser.screen.frames[frameId].points.clear();
+            laser.screen.frames[frameId].lastUpdate = millis();
+
+            // Frame clearedFrame = laser.screen.frames[frameId];
+            // clearedFrame.points.clear();
+            // laser.screen.removeFrame(frameId);
+            // laser.screen.addFrame(clearedFrame, true);
+
+            DynamicJsonBuffer jsonBufferClear(JSON_ARRAY_SIZE(2));            
+            JsonObject &rootClear = jsonBufferClear.createObject();
+            rootClear["mutation"] = "CLEAR_FRAME";
+            rootClear["frameId"] = frameId;
+            String response;
+            rootClear.printTo(response);
+            webSocket.sendTXT(num, response);
         }else if (command.compareTo("addRandomFrame") == 0){
-            laser.screen.clearFrames();
+            // laser.screen.clearFrames();
             int a = random(0, 9);
             int b = random(20, 60);
             int c = random(15, 25);
             MAIN_SERIAL.printf("Laser Digit (%d, %d, %d)", a, b, c);
-            Frame newFrame = laser.getDigit(a,255, 255);
+            Frame newFrame = laser.getDigit(a, 255, 255);
             laser.screen.addFrame(newFrame, true);
             laser.screen.visibleFrameIds[newFrame.id] = newFrame.id;
             //\"action\": \"addRandomFrame\"
@@ -165,6 +180,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             
             MAIN_SERIAL.println(rawJson);
             Frame newFrame = parseFrameJson(rawJson);
+            newFrame.lastUpdate = millis();
             laser.screen.addFrame(newFrame, true);
             webSocket.sendTXT(num, "{}");
         }else if (command.compareTo("addPoint") == 0){
@@ -180,9 +196,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             tempPoint.b = (long) root["b"];
             tempPoint.blanking = (bool) root["blanking"];
 
+            laser.screen.frames[frameId].lastUpdate = millis();
             laser.screen.frames[frameId].addPoint(tempPoint);
             webSocket.sendTXT(num, "{}");
-        }else if (command.compareTo("getVisibleFrames") == 0){
+        }else if (command.compareTo("getVisibleFrameIds") == 0){
             MAIN_SERIAL.println("Get Visible Frame List");
             //Get a json list of all visible frame ids
             DynamicJsonBuffer jsonBufferVisibile(JSON_ARRAY_SIZE(10));            
@@ -198,26 +215,17 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             String response;
             rootVisible.printTo(response);
             webSocket.sendTXT(num, response);
-        }else if (command.compareTo("getFrames") == 0){
+        }else if (command.compareTo("getFramesIds") == 0){
             MAIN_SERIAL.println("Get All Frame List");
-            //Get a json list of all visible frame ids
-            std::vector<Frame> frames;
-            frames.reserve(laser.screen.frames.size());
-            for (auto kv : laser.screen.frames)
-            {
-                frames.push_back(kv.second);
-            }
             // Assume 20 frames
             DynamicJsonBuffer jsonBuffer(JSON_ARRAY_SIZE(20) + JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(1));
             JsonObject &root = jsonBuffer.createObject();
-            JsonArray &frameIds = root.createNestedArray("frameIds");
-            for (int i = 0, len = frames.size(); i < len; i++)
+            JsonArray &jsonFrameIds = root.createNestedArray("frameIds");
+            for (auto kv : laser.screen.frames)
             {
-                frameIds.add(frames[i].id);
+                jsonFrameIds.add(kv.second.id);
             }
-
             root["mutation"] = "ALL_FRAME_IDS";
-
             String response;
             root.printTo(response);
             webSocket.sendTXT(num, response);
@@ -234,10 +242,19 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             webSocket.sendTXT(num, "{}");
         }else if (command.compareTo("getFrameInfo") == 0){
             long frameId = root["frameId"];
+            long lastUpdate = root["lastUpdate"];
+            
+            // MAIN_SERIAL.print(frameId);
+            // MAIN.SERIAL.print("   ");
+            // MAIN_SERIAL.println(lastUpdate);
             //Get a json list of all visible frame ids
             if (laser.screen.frames.count(frameId) == 0)
             {
+                MAIN_SERIAL.println("Cannot find frameId");
                 //Couldn't find frameId in the frames list
+                webSocket.sendTXT(num, "{}");
+            }else if (lastUpdate == laser.screen.frames[frameId].lastUpdate){
+                // MAIN_SERIAL.println("Frame hasn't been modified");
                 webSocket.sendTXT(num, "{}");
             }
             else
@@ -252,7 +269,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
                 newJson["y"] = selectedFrame.y;
                 newJson["width"] = selectedFrame.width;
                 newJson["height"] = selectedFrame.height;
-                newJson["changed"] = selectedFrame.changed;
+                newJson["height"] = selectedFrame.height;
+                newJson["lastUpdate"] = selectedFrame.lastUpdate;
                 newJson["numPoints"] = selectedFrame.points.size();
                 newJson["visible"] = laser.screen.isVisible(selectedFrame.id);
 
@@ -296,12 +314,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             laser.toggleLaser = !laser.toggleLaser;
             MAIN_SERIAL.printf("toggleLaser: %i", laser.toggleLaser);
             // webSocket.sendTXT(num, laser.toggleLaser);
-            webSocket.sendTXT(num, "{}");
-        }else if (command.compareTo("setChanged") == 0){
-            long frameId = root["frameId"];
-            laser.screen.frames[frameId].changed = !laser.screen.frames[frameId].changed;
-            MAIN_SERIAL.printf("changed: %i", laser.screen.frames[frameId].changed);
-            // webSocket.sendTXT(num, laser.screen.frames[frameId].changed);
             webSocket.sendTXT(num, "{}");
         }else if (command.compareTo("optimizePointOrder") == 0){
             long frameId = root["frameId"];
@@ -391,5 +403,5 @@ void loop()
 {
     laser.draw();
     webSocket.loop();
-    server.handleClient();
+    // server.handleClient();
 }

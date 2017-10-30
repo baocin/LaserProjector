@@ -32,7 +32,7 @@ class Frame
     std::vector<Point> points;
     int width, height;
     int x, y;
-    bool changed = true;
+    long lastUpdate;
     
     Frame();
     void assignPoints(std::vector<Point> points);

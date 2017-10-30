@@ -68,17 +68,18 @@ Frame::Frame()
 {
     width = 255;
     height = 255;
+    lastUpdate = millis();
 }
 
 void Frame::assignPoints(std::vector<Point> points)
 {
-    changed = true;
+    lastUpdate = millis();
     points = points;
 }
 
 void Frame::addPoint(Point p)
 {
-    changed = true;
+    lastUpdate = millis();
     points.push_back(p);
 }
 
@@ -197,7 +198,6 @@ void Frame::optimizePointOrder(){
     for (long i = 0, len = points.size() - 1; i < len; i++){
         Log.notice("Point %d: %d, %d, %d" CR, i, points[i].x, points[i].y, points[i].z);
     }
-    changed = false;
 }
 
 
@@ -276,6 +276,7 @@ void Screen::setVisibility(long frameId, bool isVisible){
             this->visibleFrameIds.end()
         );
     }
+    this->frames[frameId].lastUpdate = millis();
 }
 
 bool Screen::isVisible(long frameId){
