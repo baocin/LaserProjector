@@ -28,7 +28,7 @@ int laserPin = 27;
 //const char *ssid = "MakerSpace Charlotte";
 //const char *password = "MakeLearnShare1";
 const char *ssid = "Colin & Michael's Bachelor Pad";
-const char *password = "skyhouse2017";
+#const char *password = "";
 // const char *ssid = "Laser Projector";
 // const char *password = "projector";
 
@@ -57,10 +57,11 @@ Frame parseFrameJson(String json)
 
     //Start parsing points
     JsonArray &points = root["points"];
+    MAIN_SERIAL.print("Parsing ");
+    MAIN_SERIAL.print(points.size());
+    MAIN_SERIAL.println(" points");
     for (int i = 0, len = points.size(); i < len; i++)
     {
-        MAIN_SERIAL.print("Parsing point ");
-        MAIN_SERIAL.println(i);
         Point tempPoint;
 
         tempPoint.x = points[i]["x"];
@@ -175,6 +176,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             webSocket.sendTXT(num, "{}");
         }else if (command.compareTo("addFrame") == 0){
             MAIN_SERIAL.println("Add Frame");
+            // MAIN_SERIAL.println(root["json"]);
+            MAIN_SERIAL.flush();
             //Parse Frame JSON
             String rawJson = root.get<String>("json");
             
@@ -216,7 +219,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
             rootVisible.printTo(response);
             webSocket.sendTXT(num, response);
         }else if (command.compareTo("getFramesIds") == 0){
-            MAIN_SERIAL.println("Get All Frame List");
+            // MAIN_SERIAL.println("Get All Frame List");
             // Assume 20 frames
             DynamicJsonBuffer jsonBuffer(JSON_ARRAY_SIZE(20) + JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(1));
             JsonObject &root = jsonBuffer.createObject();
